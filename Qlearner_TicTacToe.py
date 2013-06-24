@@ -19,7 +19,7 @@ gamma  = 0.6
 alpha = 0.5
 r = 1
 k = 0.05
-epsilon = 0.9
+epsilon = 0.85
 
 #check if grid is full
 def isGridFull(grid):
@@ -31,44 +31,56 @@ def isGridFull(grid):
 				break
 	return flag
 
+#caluclate the free postions
+def free_positions(grid):
+	pos = []
+	for i in range(3):
+		for j in range(3):
+			if grid[i][j]==None:
+				pos.append((i,j))
+	return pos
+
 #return reward by checking  if won lost or draw 
 def reward_fun(grid):
 	for i in range(3):
 		if len(set(grid[:,i]))==1:
 			if grid[:,i][0]=='x':
-				return 1.0
+				return 10.0
 			elif grid[:,i][0]=='o':
-				return -1.0
+				return -10.0
 	for i in range(3):
 		if len(set(grid[i,:]))==1:
 			if grid[i,:][0]=='x':
-                                return 1.0
+                                return 10.0
                         elif grid[i,:][0]=='o':
-                                return -1.0
+                                return -10.0
 			else:
 				pass
 
 	if len(set(grid.diagonal()))==1:
 		element = list(set(grid.diagonal()))
 		if element[0]=='x':
-			return 1.0
+			return 10.0
 		elif element[0]=='o':
-			return -1.0
+			return -10.0
 		else:
 			pass
-	return 0.0
+	
+	#if diagonal(list(grid)):
+			
+	return 0
 
 #if key not in dict then return the values of the key 
 def create_actions(grid):
-	for i in range(3):
-		for j in range(3):
-			if grid[i][j]==None:
-				actions[(i,j)]=uniform(-0.15,0.15)
-			else:
-				actions[(i,j)]=-0.15
+	#for i in range(3):
+	#	for j in range(3):
+	#		if grid[i][j]==None:
+	#			actions[(i,j)]=uniform(-0.15,0.15)
+	#		else:
+	#			actions[(i,j)]=-0.15
 	
-	return actions
-
+	#return actions
+	return 0
 
 
 #checking if the move is valid
@@ -131,92 +143,138 @@ def gameover(grid):
 #The Game Learner
 def game_learner(grid,player,opp,start_state,max_games):
 	game = 0
-	state = start_state
-	
+	no_pos_left = start_state
+	state_key = [] #list containing all the possible states of the board
 	while game<max_games:
-		state_key=(state,player)
-		print '{0} Turn '.format(player)
-		if state_key not in table:
-			table[state_key]=create_actions(grid)
-			logging.info('Entry added')
+
+		#calculate all the free postitions
+		#therefore the state will be defined as (no of free pos,pos,player)
+		pos = free_positions(grid)
+		state_key = []
+		for i in pos:
+			state_key.append((no_pos_left,i,player)) #created all the possible states for that config
+		#print '{0} Turn '.format(player)
+		for states in state_key:
+			if states not in table:
+				table[states]=create_actions(grid)
+			#	logging.info('entry added')
 		act = choose(state_key,grid)#choosing a particular action using epsilon greedy
-		#logging.info('{0} is the action'.format(act))
+		logging.info('{0} is the action'.format(act))
 		if not action_valid(act,grid):
 			if isGridFull(grid):
 				print 'Grid full ABORT ABORT'
 			logging.error('action not valid {0}'.format(act))
 			pass
 		else:
-			next_state = execute(state) # function that returns the state after taking the action
+			chosen_state=(no_pos_left,act,player)
+			next_state = execute(no_pos_left) # function that returns the state after taking the action
 			grid[act[0]][act[1]]=player # adding the player to the board
 			display(grid)
-			next_state_key = (next_state,opp)
+			next_pos = free_positions(grid)
+			next_state_key=[]
+			for i in next_pos:
+				next_state_key.append((next_state,i,opp))
+
 			r = reward_fun(array(grid))
-		#	logging.info('{0} is the reward for this move'.format(r))
-			if next_state_key not in table:
-				table[next_state_key]=create_actions(grid)
-				logging.info('Entry of opp added')
-			updateQvalues(state_key,r,act,next_state_key,grid) # update the Q values of state action pair reward 
+			if isGridFull(grid):
+				if player=='x':
+					r=5
+				elif player == 'o':
+					r=-5
+				logging.info('its a draw')
+			#logging.info('{0} is the reward for this move'.format(r))
+			for next_states in next_state_key:	
+				if next_states not in table:
+					table[next_states]=create_actions(grid)
+				#	logging.info('Entry of opp added')
+			updateQvalues(chosen_state,r,act,next_state_key,grid) # update the Q values of state action pair reward 
 			if gameover(grid):
-				logging.info('Game over and rewarded awared {0}'.format(r))
+				logging.info('Game over and rewarded awared {0} and winner is {1}'.format(r,player))
 				display(grid)
 				grid = [[None for j in range(3)]for i in range(3)]
-				state=start_state
+				
 				player,opp = opp,player
+				no_pos_left = start_state
+				#state = start_state,player
 				game+=1
 			else:
 				player,opp=opp,player # switch players
-				state = next_state
+				no_pos_left-=1
+				#state = next_state
 				#logging.info("now its {0}'s turn".format(player))
+	
 		
-def execute(state):
-	if state>0:
-		return state-1
+	grid = [[None for j in range(3)]for i in range(3)]	
+	player = raw_input(' enter character(x):')
+	no_pos_left = 9
+	opp = 'o'
+	while not gameover(grid):
+		pos = input('enter position:')
+		grid[pos[0]][pos[1]]=player
+		display(grid)
+		no_pos_left = no_pos_left-1
+		free = free_positions(grid)
+		state_key = []
+		for i in free:
+			state_key.append((no_pos_left,i,opp))
+		act = choose(state_key,grid)
+		grid[act[0]][act[1]]=opp
+		display(grid)
+
+def execute(no_pos_left):
+	if no_pos_left>0:
+		return no_pos_left-1
 	else:
 		logging.info('something went wrong')	
 def choose(state_key,grid):
 	temp = random()
-	action_dict = table[state_key]
 	count = 0
-	best_list = sorted(action_dict.iteritems(),key= itemgetter(1),reverse=True)
-	while not action_valid(best_list[count][0],grid): #sorting the action list and giving the best action 
-		count+=1
-	#logging.info('the best action list for this state {0}'.format(best_list))
-	#logging.info('optimal action {0}'.format(best_list[0][0]))
-	if temp<epsilon:
-		logging.info('Best action taken {0}'.format(best_list[count][0]))
-		return best_list[count][0]
+	action_dict = {}
+	for state in state_key:
+		action_dict[state]=table[state]
+	if state_key[0][-1]=='x':	
+		best_list = sorted(action_dict.iteritems(),key= itemgetter(1),reverse=True)#get the highest
+	elif state_key[0][-1]=='o':
+		best_list = sorted(action_dict.iteritems(),key= itemgetter(1),reverse=False) # get the lowest
+	print best_list
+	if	temp<epsilon:
+		logging.info('Best action taken {0}'.format(best_list[0][0][1]))
+		return best_list[0][0][1]
 	else:
-		random_action = choice(best_list)
-		logging.info('random action taken {0}'.format(random_action))
-		return random_action[0]
-	
+		random_action = choice(best_list)[0][1]
+		logging.info('random action taken {0}'.format(random_action))	
+		return random_action
+
 def lowestQvalue(next_key): # return the lowest Q value of a particular state
 	low = []
-	for i in table[next_key].itervalues():
-		low.append(i)
+	for i in next_key:
+		low.append(table[i])
 
 	return min(low)
 		
 
 def highestQvalue(next_key): # returns the highest Q value of a particular state
 	high = []
-	for i in table[next_key].itervalues():
-		high.append(i)
-	return max(high)
+	for i in next_key:
+		high.append(table[i])
 
+	return max(high)
+count =0
 def updateQvalues(state_key,r,act,next_key,grid):
+	global alpha,count
 	if gameover(grid):
-		
+		alpha = 0.5
 		expected = r
+		count =0
 	else:
 
-		if state_key[1] == 'x': # its x's turn . so 'o' thinks of all possible movements of x so as to minimize the reward
+		if state_key[-1] == 'x': # its x's turn . so 'o' thinks of all possible movements of x so as to minimize the reward
 			expected = r + gamma*lowestQvalue(next_key)
 		else: # its 'o's turn . so 'x' thinks of the optimal action in the next state which maximises his chance of winning 
 			expected = r + gamma*highestQvalue(next_key)
-	change = alpha * (expected - table[state_key][act])
-	table[state_key][act]+=change
+	change = alpha * (expected - table[state_key])
+	alpha = alpha/(count+1)
+	table[state_key]+=change
 
 			
 
