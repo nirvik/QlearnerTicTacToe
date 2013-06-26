@@ -9,12 +9,13 @@ import logging
 logging.root.setLevel(logging.INFO)
 
 table = {}
+smart_table = {}
 player = 'x'
 opp = 'o'
-alpha=0.8
+alpha=0.5
 gamma=0.6
 count=0
-epsilon=0.7
+epsilon=0.5
 player ='x'
 opp ='o'
 
@@ -180,56 +181,93 @@ def isWinner(grid):
 	else:
 		return 0
 
+
+def return_smart_pos(signal,grid):
+
+	elements = []
+        pos=[]
+	grid = array(grid)
+
+        #top most priority to Danger 
+
+        if signal == 'Danger':
+                elements = DangerControlRow(grid) #get the danger now identify it
+                logging.info('Danger detected : {0}'.format(elements))
+                if list(grid.diagonal())==elements: #the diagonal elements
+                        for i in range(3):
+                                pos.append((i,i))
+			return pos
+		for i in range(3):
+                        if elements == list(grid[i,:]):
+                                for j in range(3):
+                                        pos.append((i,j))
+                                return pos
+                for i in range(3):
+                        if elements == list(grid[:,i]):
+                                for j in range(3):
+                                        pos.append((j,i))
+                                return pos
+                if elements == diagonalsignal(list(grid)):
+                        logging.info('Yes Opp diagonal works {0}'.format(elements))
+           		pos =diagonal_opp_pos(grid)
+			logging.error('Opp diagonal positions {0}'.format(pos))
+                 	return pos
+        if signal == 'two_in_row':
+                elements = inTwoRow(grid)
+                for i in range(3):
+                        if list(array(grid[i,:]))==elements:
+                                for j in range(3):
+                                        pos.append((i,j))
+                                return pos
+
+        if signal == 'one_in_row':
+                elements =inOwnRow(grid)
+                logging.error('elements in inOwnRow: {0} and type of grid {1}'.format(elements,type(grid)))
+                for i in range(3):
+                        if list(array(grid[i,:]))==elements:
+                                for j in range(3):
+                                        pos.append((i,j))
+                                return pos
+        elif signal == 'no':
+                return free_positions(grid)
+
+def diagonal_opp_pos(grid):
+        col = 2
+        row =0
+        x=[]
+        while row<=3 and col>=0:
+                x.append((row,col))
+                row+=1
+                col-=1
+        return x
+
+
+
+def filter_smart_pos(pos,grid):
+	#filtering out the smart recommended positions
+	index = []
+	for i in pos:
+		if grid[i[0]][i[1]]==None:
+			index.append(i)
+	return index
+
 def reward(signal,act,grid):
 	elements = [] 
-	pos=[]
-		
+	pos=return_smart_pos(signal,grid)
+	
 
 	#top most priority to Danger 
-
+	
 	if signal == 'Danger':
-		elements = DangerControlRow(grid) #get the danger now identify it
-		logging.info('Danger detected : {0}'.format(elements))
-		if list(grid.diagonal())==elements: #the diagonal elements
-			for i in range(3):
-				pos.append((i,i))
-			return danger_action_check(pos,act)
+		
+		return danger_action_check(pos,act)
 			
-		for i in range(3):
-			if elements == list(grid[i,:]):
-				for j in range(3):
-					pos.append((i,j))
-				return danger_action_check(pos,act)
-		for i in range(3):
-			if elements == list(grid[:,i]):
-				for j in range(3):
-					pos.append((j,i))
-				return danger_action_check(pos,act)
-		if elements == diagonalsignal(list(grid)):
-			logging.info('Yes Opp diagonal works {0}'.format(elements))
-			for i in range(2,-1,-1):
-				for j in range(2,-1,-1):
-					if i==j:
-						pos.append((i,j))
-			return danger_action_check(pos,act)
-			
-
 	if signal == 'two_in_row':
-		elements = inTwoRow(grid)
-		for i in range(3):
-			if list(array(grid[i,:]))==elements:
-				for j in range(3):
-					pos.append((i,j))
-				return winner_action_check(pos,act)
+		return winner_action_check(pos,act)
 
 	if signal == 'one_in_row':
-		elements =inOwnRow(grid)
-		logging.error('elements in inOwnRow: {0} and type of grid {1}'.format(elements,type(grid)))
-		for i in range(3):
-			if list(array(grid[i,:]))==elements:
-				for j in range(3):
-					pos.append((i,j))
-				return strategy_action_check(pos,act)
+		return strategy_action_check(pos,act)
+
 	elif signal == 'no':
 		if player=='x':
 			return 1
@@ -293,27 +331,21 @@ def gameover(grid):
         if (len(set(array(grid).diagonal()))==1 and array(grid).diagonal()[0]!=None)  or horizontal(array(grid)) or vertical(array(grid)) or diagonal(grid) or diagonal(grid) or isGridFull(grid):
                 return 1
         else:
-                return 0 #draw
+                return 0 
 
-def re_init_board(grid):
-	new_grid = []
-	for i in grid:
-		new_grid.append(i)
-	return new_grid
 
 
 def gamelearner(grid,start_state,max_games):
 	games =0
 	no_pos_left = start_state
-	global player,opp
+	global player,opp,epsilon
 	while games<max_games:
-		pos = free_positions(grid)
-		state_key = []
-		for i in pos:
-			state_key.append((no_pos_left,i,player))
-		for states in state_key:
-			if states not in table:
-				table[states]=uniform(-2,2)
+		if games>150:
+			epsilon=0.5
+		if games>200:
+			episilon=0.8
+		if games>300:
+			epsilon = 0.9
 		
 		signal = two_in_row(array(grid))
 		logging.info('{0} making the move'.format(player))
@@ -321,7 +353,20 @@ def gamelearner(grid,start_state,max_games):
 			signal = danger(array(grid))
 			if signal == 'NoDanger':
 				signal = one_in_row(array(grid))
+
+		pos = return_smart_pos(signal,grid)
+		pos = filter_smart_pos(pos,grid)
+		state_key = []
+		for i in pos:
+			state_key.append((no_pos_left,i,player))
+		for states in state_key:
+			if states not in table:
+				table[states]=uniform(-2,2)
+			if states not in smart_table:
+				smart_table[states]=uniform(-2,2)	
+		
 		logging.info('SIGNAL {0}'.format(signal))
+		logging.info('Smart table recommended positions : {0}'.format(pos))
 		act = choose(state_key) # passing the key sequence. getting the pos 
 		logging.error('The action {0}'.format(act))	
 		r = reward(signal,act,array(grid))
@@ -370,7 +415,14 @@ def choose(state_key):
 	action_dict = {}
 	
 	for state in state_key:
-		action_dict[state]=table[state]
+		#action_dict[state]=table[state]
+		if smart_table[state]==[]:
+			action_dict[state]=table[state]
+			logging.error('Taking decisions from normal table')
+		else:
+			action_dict[state]=smart_table[state]
+			logging.error('Using smart table')
+		
 	#logging.info('dict created for actions {0}'.format(action_dict))
 	if state_key[0][-1]=='x':
 		best = sorted(action_dict.iteritems(),key= itemgetter(1),reverse=True)
@@ -378,10 +430,12 @@ def choose(state_key):
 		best = sorted(action_dict.iteritems(),key= itemgetter(1),reverse=False)
 	#logging.error('List error {0}'.format(best))
 	if temp<epsilon:
+		logging.info('The BEST ACTION TAKEN')
+		logging.info('Action info:{0}'.format(best[0]))
 		return best[0][0][1]
 	else:
 		random_action = choice(best)[0]
-		
+		logging.info('RANDOM ACTION TAKEN :{0}'.format(random_action))
 		return random_action[1]
 
 def lowestQvalue(next_key): # return the lowest Q value of a particular state
