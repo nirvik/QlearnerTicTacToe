@@ -19,12 +19,6 @@ epsilon=0.5
 player ='x'
 opp ='o'
 
-
-def check(grid):
-	if None not in grid:
-		return 1
-	else:
-		return 0
 def free_positions(grid):
  	pos = []
         for i in range(3):
@@ -37,7 +31,7 @@ def checkNone(grid):
 		return 1
 	else:
 		return 0
-
+#these are the signal generations 
 def danger(grid):
 	#danger condition
 	enemy_dia = list(grid.diagonal()).count(opp)
@@ -66,17 +60,6 @@ def two_in_row(grid): #own player
 			return 'two_in_row'
 	return 'no'
 
-def empty(grid):
-	flag = 1
-	for i in range(3):
-		for j in range(3):
-			if grid[i][j]!=None:
-				flag = 0
-				break
-	if flag == 0:
-		return 'notEmpty'
-	else:
-		return 'Empty'
 			
 def diagonalsignal(grid):
         col = 2
@@ -90,7 +73,7 @@ def diagonalsignal(grid):
 
 # the next 5 functions used for rewards 
 
-
+# this function shows the list which has 2 own players in a row
 def inTwoRow(grid):
 	logging.error('inTwoRow Reched ')	
 	grid = array(grid)
@@ -100,6 +83,7 @@ def inTwoRow(grid):
 			if  checkNone(list(grid[i,:])):
 				logging.info('SATISFIED 2 IN A ROW {0}'.format(grid[:,i]))
                         	return list(grid[i,:])
+#this function shows the list which has only one own player in the board
 def inOwnRow(grid):
 	
 	logging.error('inOwnRow reached')
@@ -111,7 +95,7 @@ def inOwnRow(grid):
 				logging.error('SATISFIED AND NONE IS PRESENT')
                         	return list(grid[i,:])
  
-       
+# this function shows which is the dangerous condition  
 def DangerControlRow(grid):
 	grid = array(grid)
 	enemy_dia = list(grid.diagonal()).count(opp)
@@ -132,6 +116,8 @@ def DangerControlRow(grid):
         if diagonalsignal(list(grid)).count(opp)==2 and checkNone(diagonalsignal(list(grid))):
                 return diagonalsignal(list(grid))
 
+
+# this returns the award for the action taken by the player against the danger
 def danger_action_check(pos,act):
 		logging.info('Danger action reached')
 		global player
@@ -148,7 +134,7 @@ def danger_action_check(pos,act):
                         elif player =='o':
                               	return 10
 
-
+#this is the reward it returns for the action the player takes  against a winning condition
 def winner_action_check(pos,act):
 	logging.error('INSIDE WINNER')
 	if act in pos:
@@ -163,6 +149,7 @@ def winner_action_check(pos,act):
 		elif player=='o':
 			return 10
 
+
 def strategy_action_check(pos,act):
 	logging.error('INSIDE STATEGY BUILDUP')
 	if act in pos:
@@ -175,13 +162,15 @@ def strategy_action_check(pos,act):
 			return -1
 		elif player == 'o':
 			return 1
+
+#this function is used for checking if anyone has won the game in gameLearning loop
 def isWinner(grid):
 	if (len(set(array(grid).diagonal()))==1 and array(grid).diagonal()[0]!=None)  or horizontal(array(grid)) or vertical(array(grid)) or diagonal(grid) or diagonal(grid):
 		return 1
 	else:
 		return 0
 
-
+#returns smart positions according to the signal
 def return_smart_pos(signal,grid):
 
 	elements = []
@@ -231,6 +220,7 @@ def return_smart_pos(signal,grid):
         elif signal == 'no':
                 return free_positions(grid)
 
+#this returns the opp diagonal positions for the danger signal 
 def diagonal_opp_pos(grid):
         col = 2
         row =0
@@ -274,6 +264,7 @@ def reward(signal,act,grid):
 		elif player=='o':
 			return -1
 
+# used as one of the conditions for GAME OVER
 def isGridFull(grid):
         flag = 1
         for i in range(3):
@@ -327,6 +318,7 @@ def display(grid):
                 print '\n'
         print '\n\n'
 
+#this defines when to decide when game is over
 def gameover(grid):
         if (len(set(array(grid).diagonal()))==1 and array(grid).diagonal()[0]!=None)  or horizontal(array(grid)) or vertical(array(grid)) or diagonal(grid) or diagonal(grid) or isGridFull(grid):
                 return 1
@@ -334,7 +326,7 @@ def gameover(grid):
                 return 0 
 
 
-
+# THE GAME LEARNER
 def gamelearner(grid,start_state,max_games):
 	games =0
 	no_pos_left = start_state
@@ -367,7 +359,7 @@ def gamelearner(grid,start_state,max_games):
 		
 		logging.info('SIGNAL {0}'.format(signal))
 		logging.info('Smart table recommended positions : {0}'.format(pos))
-		act = choose(state_key) # passing the key sequence. getting the pos 
+		act = choose(state_key,games) # passing the key sequence. getting the pos 
 		logging.error('The action {0}'.format(act))	
 		r = reward(signal,act,array(grid))
 		logging.info('Reward for this move {0}'.format(r))
@@ -410,13 +402,13 @@ def execute(no_pos_left):
 		logging.error('Some shit happened')
 	#	return 0
 
-def choose(state_key):
+def choose(state_key,games):
 	temp = random()
 	action_dict = {}
 	
 	for state in state_key:
 		#action_dict[state]=table[state]
-		if smart_table[state]==[]:
+		if games>1000:#smart_table[state]==[]:
 			action_dict[state]=table[state]
 			logging.error('Taking decisions from normal table')
 		else:
